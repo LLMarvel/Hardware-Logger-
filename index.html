@@ -73,10 +73,30 @@
         background-position: right 12px center;
       }
 
+      .choice-btn {
+        width: 100%;
+        padding: 14px;
+        margin-bottom: 10px;
+        background: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        font-size: 15px;
+        cursor: pointer;
+        text-align: left;
+        font-family: Arial, sans-serif;
+        color: #333;
+        transition: background 0.15s;
+      }
+
+      .choice-btn:hover {
+        background: #f0faf6;
+        border-color: #1D9E75;
+      }
+
       .camera-box {
         border: 2px dashed #ddd;
         border-radius: 12px;
-        padding: 24px;
+        padding: 16px;
         text-align: center;
         margin-bottom: 16px;
         cursor: pointer;
@@ -85,27 +105,6 @@
 
       .camera-box:hover {
         border-color: #1D9E75;
-      }
-
-      .camera-box input {
-        display: none;
-      }
-
-      .camera-box .icon {
-        font-size: 40px;
-        margin-bottom: 8px;
-      }
-
-      .camera-box p {
-        font-size: 13px;
-        color: #888;
-      }
-
-      #preview {
-        display: none;
-        width: 100%;
-        border-radius: 8px;
-        margin-top: 12px;
       }
 
       .raw-text-box {
@@ -245,16 +244,25 @@
       </label>
 
       <label>Photo</label>
-      <div class="camera-box" onclick="document.getElementById('photoInput').click()">
-        <input
-          type="file"
-          id="photoInput"
-          accept="image/*"
-          onchange="previewPhoto(this)"
-        >
-        <div class="icon">📷</div>
-        <p>Tap to take a photo or upload from your device</p>
-        <img id="preview" src="" alt="Preview">
+
+      <!-- Hidden file inputs -->
+      <input type="file" id="photoCamera"  accept="image/*" capture="environment" onchange="previewPhoto(this)" style="display:none">
+      <input type="file" id="photoLibrary" accept="image/*" onchange="previewPhoto(this)" style="display:none">
+
+      <!-- Choice buttons -->
+      <div id="photoChoice">
+        <button class="choice-btn" onclick="document.getElementById('photoCamera').click()">
+          📷 Take a Photo
+        </button>
+        <button class="choice-btn" onclick="document.getElementById('photoLibrary').click()">
+          🖼️ Upload from Library
+        </button>
+      </div>
+
+      <!-- Preview shows after photo selected -->
+      <div class="camera-box" id="previewBox" style="display:none" onclick="resetPhoto()">
+        <img id="preview" src="" alt="Preview" style="width:100%;border-radius:8px;">
+        <p style="margin-top:8px;font-size:12px;color:#888">Tap to change photo</p>
       </div>
 
       <div class="progress-bar" id="progressBar">
@@ -299,14 +307,23 @@
 
         const reader = new FileReader();
         reader.onload = function(e) {
-          const preview = document.getElementById('preview');
-          preview.src = e.target.result;
-          preview.style.display = 'block';
-          document.querySelector('.camera-box .icon').style.display = 'none';
-          document.querySelector('.camera-box p').style.display = 'none';
-          readTextFromPhoto(input.files[0]);
+          document.getElementById('preview').src = e.target.result;
+          document.getElementById('photoChoice').style.display = 'none';
+          document.getElementById('previewBox').style.display  = 'block';
+          readTextFromPhoto(file);
         };
         reader.readAsDataURL(file);
+      }
+
+      function resetPhoto() {
+        document.getElementById('photoCamera').value  = '';
+        document.getElementById('photoLibrary').value = '';
+        document.getElementById('preview').src        = '';
+        document.getElementById('previewBox').style.display  = 'none';
+        document.getElementById('photoChoice').style.display = 'block';
+        document.getElementById('rawText').style.display     = 'none';
+        document.getElementById('rawLabel').style.display    = 'none';
+        document.getElementById('status').textContent        = '';
       }
 
       // ─── TESSERACT OCR ────────────────────────────────────────────
@@ -411,15 +428,15 @@
           { keywords: ['desktop', 'tower', 'optiplex'],                label: 'Desktop' },
           { keywords: ['monitor', 'display'],                          label: 'Monitor' },
           { keywords: ['router', 'gateway'],                           label: 'Router' },
-          { keywords: ['switch'],                                      label: 'Network Switch' },
-          { keywords: ['printer'],                                     label: 'Printer' },
-          { keywords: ['tablet', 'ipad'],                              label: 'Tablet' },
-          { keywords: ['server'],                                      label: 'Server' },
-          { keywords: ['keyboard'],                                    label: 'Keyboard' },
-          { keywords: ['mouse'],                                       label: 'Mouse' },
-          { keywords: ['hard drive', 'hdd', 'barracuda', 'ironwolf'], label: 'Hard Drive' },
-          { keywords: ['ssd', 'solid state'],                          label: 'SSD' },
-          { keywords: ['ram', 'memory', 'dimm'],                       label: 'RAM' },
+          { keywords: ['switch'],                                       label: 'Network Switch' },
+          { keywords: ['printer'],                                      label: 'Printer' },
+          { keywords: ['tablet', 'ipad'],                               label: 'Tablet' },
+          { keywords: ['server'],                                       label: 'Server' },
+          { keywords: ['keyboard'],                                     label: 'Keyboard' },
+          { keywords: ['mouse'],                                        label: 'Mouse' },
+          { keywords: ['hard drive', 'hdd', 'barracuda', 'ironwolf'],  label: 'Hard Drive' },
+          { keywords: ['ssd', 'solid state'],                           label: 'SSD' },
+          { keywords: ['ram', 'memory', 'dimm'],                        label: 'RAM' },
         ];
         const lowerText = text.toLowerCase();
         for (const type of deviceTypes) {
@@ -434,8 +451,12 @@
       function submitPhoto() {
         const userName   = document.getElementById('userName').value;
         const location   = getLocation();
-        const photoInput = document.getElementById('photoInput');
         const status     = document.getElementById('status');
+
+        // Figure out which input has the photo
+        const photoInput = document.getElementById('photoCamera').files[0]
+          ? document.getElementById('photoCamera')
+          : document.getElementById('photoLibrary');
 
         if (!userName) {
           status.textContent = '⚠️ Please enter your name.';
@@ -493,22 +514,23 @@
               status.style.color = '#1D9E75';
 
               // Clear form for next device
-              document.getElementById('userName').value            = '';
-              document.getElementById('locationSelect').value      = '';
+              document.getElementById('userName').value               = '';
+              document.getElementById('locationSelect').value         = '';
               document.getElementById('locationCustom').style.display = 'none';
-              document.getElementById('locationCustom').value      = '';
-              document.getElementById('deviceType').value          = '';
-              document.getElementById('manufacturer').value        = '';
-              document.getElementById('model').value               = '';
-              document.getElementById('serial').value              = '';
-              document.getElementById('notes').value               = '';
-              document.getElementById('eWasted').checked           = false;
-              document.getElementById('photoInput').value          = '';
-              document.getElementById('preview').style.display     = 'none';
-              document.getElementById('rawText').style.display     = 'none';
-              document.getElementById('rawLabel').style.display    = 'none';
-              document.querySelector('.camera-box .icon').style.display = 'block';
-              document.querySelector('.camera-box p').style.display     = 'block';
+              document.getElementById('locationCustom').value         = '';
+              document.getElementById('deviceType').value             = '';
+              document.getElementById('manufacturer').value           = '';
+              document.getElementById('model').value                  = '';
+              document.getElementById('serial').value                 = '';
+              document.getElementById('notes').value                  = '';
+              document.getElementById('eWasted').checked              = false;
+              document.getElementById('photoCamera').value            = '';
+              document.getElementById('photoLibrary').value           = '';
+              document.getElementById('preview').src                  = '';
+              document.getElementById('previewBox').style.display     = 'none';
+              document.getElementById('photoChoice').style.display    = 'block';
+              document.getElementById('rawText').style.display        = 'none';
+              document.getElementById('rawLabel').style.display       = 'none';
 
             } else {
               status.textContent = '⚠️ Something went wrong. Try again.';
